@@ -1,2 +1,3 @@
-# cma-test
-Simple test for cross memory attach
+# CMA test
+
+Simple stream-like test for Linux cross memory attach routines `process_vm_readv` and `process_vm_writev`
