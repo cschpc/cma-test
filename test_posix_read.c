@@ -170,7 +170,7 @@ int main(int argc, char** argv)
     printf("Function    Best Rate MB/s  Avg time     Min time     Max time\n");
     avgtime = avgtime / (double)(NTIMES-1);
 
-    printf("%s%12.1f  %11.6f  %11.6f  %11.6f\n", "POSIX write",
+    printf("%s%12.1f  %11.6f  %11.6f  %11.6f\n", "POSIX read",
            1.0E-06 * bytes/mintime,
            avgtime,
            mintime,
