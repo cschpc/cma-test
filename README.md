@@ -1,3 +1,6 @@
-# CMA test
+# Shared memory benchmarks
 
-Simple stream-like test for Linux cross memory attach routines `process_vm_readv` and `process_vm_writev`
+Simple stream-like benchmarks for shared memory writes and reads.
+
+- Linux cross memory attach routines `process_vm_readv` and `process_vm_writev`
+- POSIX shared memory API
