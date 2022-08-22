@@ -147,7 +147,7 @@ int main(int argc, char** argv)
     for (int k=0; k < NTIMES; k++)
       {
         times[k] = mysecond();
-        size_t nread = process_vm_writev(ppid, local, 1, remote, 1, 0);
+        size_t nwrite = process_vm_writev(ppid, local, 1, remote, 1, 0);
         times[k] = mysecond() - times[k];
       }
 
@@ -163,7 +163,7 @@ int main(int argc, char** argv)
     printf("Function    Best Rate MB/s  Avg time     Min time     Max time\n");
     avgtime = avgtime / (double)(NTIMES-1);
 
-    printf("%s%12.1f  %11.6f  %11.6f  %11.6f\n", "vm_readv",
+    printf("%s%12.1f  %11.6f  %11.6f  %11.6f\n", "vm_writev",
            1.0E-06 * bytes/mintime,
            avgtime,
            mintime,
