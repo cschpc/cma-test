@@ -10,8 +10,6 @@ double mysecond()
         return ( (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6 );
 }
 
-static double a[BUF_SIZE], b[BUF_SIZE];
-
 int main(int argc, char** argv)
 {
 
@@ -20,6 +18,9 @@ int main(int argc, char** argv)
   double mintime = FLT_MAX;
   double maxtime = 0;  
 
+  double *a = (double *) malloc(BUF_SIZE * sizeof(double));
+  double *b = (double *) malloc(BUF_SIZE * sizeof(double));
+  
   for (int i=0; i < BUF_SIZE; i++) {
     a[i] = i;
     b[i] = -1.0;
@@ -58,13 +59,18 @@ int main(int argc, char** argv)
          avgtime,
          mintime,
          maxtime);
-  
-  double checksum = 0.0;
-  for (int i=0; i < BUF_SIZE; i++)
-    checksum += b[i];
-  
-  checksum /= BUF_SIZE;
 
+  // Use Kahan's algorithm for summation
+  double checksum = b[0];
+  double tmp_c = 0.0;
+  for (size_t i=1; i < BUF_SIZE; i++) {
+    double y = b[i] - tmp_c;
+    double t = checksum + y;
+    tmp_c = (t - checksum) - y;
+    checksum = t;
+  }
+  checksum /= (double) BUF_SIZE;
+  
   printf(HLINE);
   printf("check: %f %f\n", checksum, 0.5*(BUF_SIZE-1));
 

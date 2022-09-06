@@ -64,8 +64,6 @@ double mysecond()
         return ( (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6 );
 }
 
-static double a[BUF_SIZE], b[BUF_SIZE];
-
 int main(int argc, char** argv)
 {
 
@@ -97,6 +95,7 @@ int main(int argc, char** argv)
 
   pid_t cpid = fork();
 
+  // child
   if (0 == cpid) {
     close(pipefd[1]);
 
@@ -109,6 +108,8 @@ int main(int argc, char** argv)
     cpuset_to_cstr(&coremask, clbuf);
     printf("Affinity in child: %s\n", clbuf);
     fflush(stdout);
+
+    double *a = (double *) malloc(BUF_SIZE * sizeof(double));
     
     for (int i=0; i < BUF_SIZE; i++)
        a[i] = i;
@@ -151,6 +152,7 @@ int main(int argc, char** argv)
            mintime,
            maxtime);
 
+  // parent
   } else {
     close(pipefd[0]);
 
@@ -163,9 +165,10 @@ int main(int argc, char** argv)
     cpuset_to_cstr(&coremask, clbuf);
     printf("Affinity in parent: %s\n", clbuf);
     fflush(stdout);
+
+    double *b = (double *) malloc(BUF_SIZE * sizeof(double));
     
     for (int i=0; i < BUF_SIZE; i++) {
-       a[i] = -1;
        b[i] = -1;
     }
 
@@ -178,12 +181,17 @@ int main(int argc, char** argv)
     for (int i=0; i < BUF_SIZE; i++)
       b[i] = shm_ptr[i];
 
-    double checksum = 0.0;
-    for (int i=0; i < BUF_SIZE; i++)
-      checksum += b[i];
-
-    checksum /= BUF_SIZE;
-
+    // Use Kahan's algorithm for summation
+    double checksum = b[0];
+    double tmp_c = 0.0;
+    for (size_t i=1; i < BUF_SIZE; i++) {
+      double y = b[i] - tmp_c;
+      double t = checksum + y;
+      tmp_c = (t - checksum) - y;
+      checksum = t;
+    }
+    checksum /= (double) BUF_SIZE;
+    
     printf(HLINE);
     printf("check: %f %f\n", checksum, 0.5*(BUF_SIZE-1));
 

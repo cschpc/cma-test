@@ -64,8 +64,6 @@ double mysecond()
         return ( (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6 );
 }
 
-static double a[BUF_SIZE], b[BUF_SIZE];
-
 int main(int argc, char** argv)
 {
 
@@ -94,6 +92,7 @@ int main(int argc, char** argv)
 
   pid_t cpid = fork();
 
+  // child
   if (0 == cpid) {
     close(pipefd[1]);
 
@@ -107,13 +106,17 @@ int main(int argc, char** argv)
     printf("Affinity in child: %s\n", clbuf);
     fflush(stdout);
 
+    double *a;
+    double *b = (double *) malloc(BUF_SIZE * sizeof(double));
+
     // invalidate data
-    for (int i=0; i < BUF_SIZE; i++) {
-       a[i] = -1;
+    for (size_t i=0; i < BUF_SIZE; i++) {
        b[i] = -1;
     }
 
     // synchronize with parent
+    if (read(pipefd[0], &a, sizeof(double *)) == 0)
+        printf("child didn't get data\n");
     char dummy;
     if (read(pipefd[0], &dummy, 1) != 0)
         printf("child didn't get EOF\n");
@@ -125,18 +128,27 @@ int main(int argc, char** argv)
     remote[0].iov_base = a;
     remote[0].iov_len = BUF_SIZE * sizeof(double);
 
+    size_t nread;
     for (int k=0; k < NTIMES; k++)
       {
         times[k] = mysecond();
-        size_t nread = process_vm_readv(ppid, local, 1, remote, 1, 0);
+        nread = process_vm_readv(ppid, local, 1, remote, 1, 0);
         times[k] = mysecond() - times[k];
       }
+    if (-1 == nread) {
+      printf("Error in read %d\n", errno);
+    }
 
-    double checksum = 0.0;
-    for (int i=0; i < BUF_SIZE; i++)
-      checksum += b[i];
-
-    checksum /= BUF_SIZE;
+    // Use Kahan's algorithm for summation
+    double checksum = b[0];
+    double tmp_c = 0.0;
+    for (size_t i=1; i < BUF_SIZE; i++) {
+      double y = b[i] - tmp_c;
+      double t = checksum + y;
+      tmp_c = (t - checksum) - y;
+      checksum = t;
+    }
+    checksum /= (double) BUF_SIZE;
 
     for (int k=1; k < NTIMES; k++) /* note -- skip first iteration */
       {
@@ -159,6 +171,7 @@ int main(int argc, char** argv)
     printf(HLINE);
     printf("check: %f %f\n", checksum, 0.5*(BUF_SIZE-1));
 
+  // parent
   } else {
     close(pipefd[0]);
 
@@ -172,8 +185,13 @@ int main(int argc, char** argv)
     printf("Affinity in parent: %s\n", clbuf);
     fflush(stdout);
 
-    for (int i=0; i < BUF_SIZE; i++)
+    double *a = (double *) malloc(BUF_SIZE * sizeof(double));
+
+    for (size_t i=0; i < BUF_SIZE; i++)
       a[i] = i;
+
+    if (write(pipefd[1], &a, sizeof(double *)) == 0)
+        printf("Parent couldn't write data\n");
 
     // synchronize with child
     close(pipefd[1]);
