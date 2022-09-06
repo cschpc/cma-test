@@ -93,7 +93,7 @@ int main(int argc, char** argv)
 
   int shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
   ftruncate(shm_fd, BUF_SIZE * sizeof(double));
-  double restrict *shm_ptr = (double *) mmap(0, BUF_SIZE * sizeof(double), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  double *shm_ptr = (double *) mmap(0, BUF_SIZE * sizeof(double), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
   pid_t cpid = fork();
 
