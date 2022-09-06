@@ -22,32 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ------------------------------------------------------------------------------ */
 
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <sys/uio.h>
-#include <sched.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <float.h>
-#include <sys/time.h>
-#include <string.h>
-#include <fcntl.h>
-#include <sys/shm.h>
-#include <sys/mman.h>
-
-#define BUF_SIZE 10000000
-#define NTIMES 10
-
-# ifndef MIN
-# define MIN(x,y) ((x)<(y)?(x):(y))
-# endif
-# ifndef MAX
-# define MAX(x,y) ((x)>(y)?(x):(y))
-# endif
-
-# define HLINE "-------------------------------------------------------------\n"
+#include "shmem_tests.h"
 
 /* Borrowed from util-linux-2.13-pre7/schedutils/taskset.c */
 static char *cpuset_to_cstr(cpu_set_t *mask, char *str)
@@ -118,7 +93,7 @@ int main(int argc, char** argv)
 
   int shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
   ftruncate(shm_fd, BUF_SIZE * sizeof(double));
-  double *shm_ptr = (double *) mmap(0, BUF_SIZE * sizeof(double), PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  double restrict *shm_ptr = (double *) mmap(0, BUF_SIZE * sizeof(double), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
   pid_t cpid = fork();
 
@@ -152,9 +127,13 @@ int main(int argc, char** argv)
       {
         times[k] = mysecond();
         // read data
+#ifdef USE_AVX      
+        #pragma omp simd
         for (int i=0; i < BUF_SIZE; i++)
           b[i] = shm_ptr[i];
-
+#else
+        memcpy(b, shm_ptr, sizeof(double) * BUF_SIZE);
+#endif
         times[k] = mysecond() - times[k];
       }
 
@@ -165,7 +144,7 @@ int main(int argc, char** argv)
         maxtime = MAX(maxtime, times[k]);
       }
     
-    size_t bytes = 2 * sizeof(double) * BUF_SIZE;
+    size_t bytes = BW_CONVENTION * sizeof(double) * BUF_SIZE;
   
     printf("Function    Best Rate MB/s  Avg time     Min time     Max time\n");
     avgtime = avgtime / (double)(NTIMES-1);
