@@ -1,4 +1,7 @@
 #include "shmem_tests.h"
+#ifdef USE_INTRINSICS
+#include <immintrin.h>
+#endif
 
 double mysecond()
 {
@@ -18,8 +21,22 @@ int main(int argc, char** argv)
   double mintime = FLT_MAX;
   double maxtime = 0;  
 
-  double *a = (double *) malloc(BUF_SIZE * sizeof(double));
-  double *b = (double *) malloc(BUF_SIZE * sizeof(double));
+  double *a, *b;
+  posix_memalign((void *)&a, 32, BUF_SIZE * sizeof(double));
+  posix_memalign((void *)&b, 32, BUF_SIZE * sizeof(double));
+
+  printf("Array size: %d MB\n", BUF_SIZE / 1000000);
+#ifdef USE_AVX      
+  printf("Using omp SIMD (note: compiler might still optimize for memcpy)\n");
+#elif defined USE_INTRINSICS
+  #ifdef USE_STREAMING
+  printf("Using intrinsics with non-temporal stores\n");
+  #else
+  printf("Using intrinsics\n");
+  #endif
+#else
+  printf("Using memcpy\n");
+#endif
   
   for (int i=0; i < BUF_SIZE; i++) {
     a[i] = i;
@@ -32,9 +49,18 @@ int main(int argc, char** argv)
 
       // copy data
 #ifdef USE_AVX      
-      #pragma omp simd
+      #pragma omp simd aligned(a, b : 32)
       for (int i=0; i < BUF_SIZE; i++)
         b[i] = a[i];
+#elif defined USE_INTRINSICS
+      for (int i=0; i < BUF_SIZE; i += 4) {
+        __m256d src = _mm256_load_pd(&a[i]);
+        #ifdef USE_STREAMING
+        _mm256_stream_pd(&b[i], src);
+        #else
+        _mm256_store_pd(&b[i], src);
+        #endif
+      }
 #else
       memcpy(b, a, sizeof(double) * BUF_SIZE);
 #endif      
